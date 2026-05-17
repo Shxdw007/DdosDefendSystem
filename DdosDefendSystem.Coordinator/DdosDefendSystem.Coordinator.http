@@ -1,0 +1,6 @@
+@DdosDefendSystem.Coordinator_HostAddress = http://localhost:5132
+
+GET {{DdosDefendSystem.Coordinator_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
