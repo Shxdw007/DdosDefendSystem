@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Fonts\perfectdosvga437.ttf" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DdosDefendSystem.Shared\DdosDefendSystem.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Fonts\perfectdosvga437.ttf" />
+  </ItemGroup>
+
+</Project>
