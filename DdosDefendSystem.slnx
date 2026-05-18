@@ -1,5 +1,7 @@
 <Solution>
+  <Project Path="DdosDefendSystem.AdminPanel/DdosDefendSystem.AdminPanel.csproj" Id="e99fcccf-66ac-44e5-a637-ef4bc3411f45" />
   <Project Path="DdosDefendSystem.Agent/DdosDefendSystem.Agent.csproj" Id="0a5a7b7e-e12d-4950-8cb7-abe179305539" />
   <Project Path="DdosDefendSystem.Coordinator/DdosDefendSystem.Coordinator.csproj" Id="f65a3b0d-9139-42e9-b4f7-11b58e0d715a" />
   <Project Path="DdosDefendSystem.Shared/DdosDefendSystem.Shared.csproj" Id="bda551b2-cebf-4609-a2e6-b94af70119ec" />
+  <Project Path="DdosDefendSystem.TrafficGenerator/DdosDefendSystem.TrafficGenerator.csproj" Id="2e80d43b-5bc9-4e9b-b5ac-8eb94be33fd4" />
 </Solution>
