@@ -14,7 +14,7 @@ namespace DdosDefendSystem.Shared.Models
 
         public int StatusCode { get; set; }
 
-        public double ResponseTimeSeconds { get; set; }
+        public double ResponseTime { get; set; }
 
         public DateTime Timestamp { get; set; }
 

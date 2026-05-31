@@ -23,7 +23,6 @@ public partial class MainWindow : Window
         BlacklistGrid.ItemsSource = BannedIpsUi;
         LiveTrafficLog.ItemsSource = RecentTraffic;
 
-        // Настраиваем таймер: тик каждую секунду
         _updateTimer.Interval = TimeSpan.FromSeconds(1);
         _updateTimer.Tick += UpdateTimer_Tick;
         _updateTimer.Start();

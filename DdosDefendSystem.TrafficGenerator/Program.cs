@@ -75,7 +75,7 @@ class Program
     private static async Task GenerateDdosAttack()
     {
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine("\n[🚀] ВНИМАНИЕ! ЗАПУСК DDoS АТАКИ...");
+        Console.WriteLine("\nВНИМАНИЕ! ЗАПУСК DDoS АТАКИ...");
 
         using var stream = new FileStream(LogFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
         using var writer = new StreamWriter(stream);

@@ -5,8 +5,7 @@ var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddSingleton<NginxLogParser>();
 
-builder.Services.AddSingleton<IBlocker, MockLinuxBlocker>();
-
+builder.Services.AddSingleton<IBlocker, RealLinuxBlocker>();
 builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<BlacklistSyncWorker>();
 
