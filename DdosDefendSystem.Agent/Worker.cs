@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using DdosDefendSystem.Agent.Services;
+using DdosDefendSystem.Shared;
 using DdosDefendSystem.Shared.Models;
 
 namespace DdosDefendSystem.Agent;
@@ -9,7 +10,7 @@ public class Worker : BackgroundService
     private readonly ILogger<Worker> _logger;
     private readonly NginxLogParser _parser;
     private readonly IHttpClientFactory _httpClientFactory;
-    private const string LogFilePath = "test_access.log";
+    private static readonly string LogFilePath = LogFilePaths.AgentAccessLog;
 
     // Добавили IHttpClientFactory в конструктор
     public Worker(ILogger<Worker> logger, NginxLogParser parser, IHttpClientFactory httpClientFactory)
@@ -22,6 +23,8 @@ public class Worker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("DDoS Agent запущен. Читаем лог: {Path}", LogFilePath);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(LogFilePath)!);
 
         if (!File.Exists(LogFilePath))
         {
@@ -41,32 +44,45 @@ public class Worker : BackgroundService
 
             if (line != null)
             {
-                var logEvent = _parser.Parse(line);
+                RequestLog? logEvent;
 
-                if (logEvent != null)
+                try
                 {
-                    _logger.LogInformation("Пойман запрос: IP: {Ip} | Метод: {Method} | URI: {Uri}",
-                        logEvent.IpAddress, logEvent.HttpMethod, logEvent.Uri);
+                    logEvent = _parser.Parse(line);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Ошибка парсинга строки лога: {Line}", line);
+                    continue;
+                }
 
-                    var payload = new List<RequestLog> { logEvent };
+                if (logEvent == null)
+                {
+                    _logger.LogWarning("Не удалось распарсить строку лога: {Line}", line);
+                    continue;
+                }
 
-                    try
+                _logger.LogInformation("Пойман запрос: IP: {Ip} | Метод: {Method} | URI: {Uri} | ResponseTime: {ResponseTime}",
+                    logEvent.IpAddress, logEvent.HttpMethod, logEvent.Uri, logEvent.ResponseTime);
+
+                var payload = new List<RequestLog> { logEvent };
+
+                try
+                {
+                    var response = await httpClient.PostAsJsonAsync("/api/logs", payload, stoppingToken);
+
+                    if (response.IsSuccessStatusCode)
                     {
-                        var response = await httpClient.PostAsJsonAsync("/api/logs", payload, stoppingToken);
-
-                        if (response.IsSuccessStatusCode)
-                        {
-                            _logger.LogInformation("Лог успешно отправлен Координатору!");
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Ошибка отправки: Координатор вернул статус {Status}", response.StatusCode);
-                        }
+                        _logger.LogInformation("Лог успешно отправлен Координатору!");
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        _logger.LogError("Сервер Координатора недоступен: {Message}", ex.Message);
+                        _logger.LogWarning("Ошибка отправки: Координатор вернул статус {Status}", response.StatusCode);
                     }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Сервер Координатора недоступен: {Message}", ex.Message);
                 }
             }
             else
