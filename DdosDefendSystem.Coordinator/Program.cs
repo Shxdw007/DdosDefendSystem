@@ -60,12 +60,16 @@ app.MapPost("/api/auth/login", async ([FromBody] LoginRequest request, AppDbCont
     return Results.Ok(new { Message = "ACCESS_GRANTED", Role = user.Role });
 });
 
-app.MapPost("/api/logs", ([FromBody] List<RequestLog> logs, DdosAnalyzer analyzer, System.Collections.Concurrent.ConcurrentQueue<RequestLog> recentLogs) =>
+app.MapPost("/api/logs", ([FromBody] List<RequestLog>? logs, DdosAnalyzer analyzer, System.Collections.Concurrent.ConcurrentQueue<RequestLog> recentLogs) =>
 {
+    if (logs == null || logs.Count == 0)
+        return Results.BadRequest();
+
     foreach (var log in logs)
     {
         recentLogs.Enqueue(log);
-        if (recentLogs.Count > 50) recentLogs.TryDequeue(out _); 
+        while (recentLogs.Count > 50)
+            recentLogs.TryDequeue(out _);
     }
 
     analyzer.Analyze(logs);
