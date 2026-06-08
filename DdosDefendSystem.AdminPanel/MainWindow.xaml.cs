@@ -19,7 +19,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        _httpClient.BaseAddress = new Uri("https://localhost:7105");
+        _httpClient = AppConfig.CreateCoordinatorClient();
         BlacklistGrid.ItemsSource = BannedIpsUi;
         LiveTrafficLog.ItemsSource = RecentTraffic;
 

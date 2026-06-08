@@ -13,7 +13,7 @@ public partial class LoginWindow : Window
     public LoginWindow() 
     {
         InitializeComponent();
-        _httpClient.BaseAddress = new Uri("https://localhost:7105"); 
+        _httpClient = AppConfig.CreateCoordinatorClient();
     }
 
     private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
