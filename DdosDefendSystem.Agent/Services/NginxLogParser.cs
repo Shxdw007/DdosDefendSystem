@@ -6,44 +6,49 @@ namespace DdosDefendSystem.Agent.Services;
 
 public class NginxLogParser
 {
-    private static readonly Regex LogRegex = new Regex(
-        @"(?<ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}).*?""(?<method>[A-Z]+)\s+(?<uri>[^\s""]+).*?""\s+(?<status>\d+)",
-        RegexOptions.Compiled);
+  // Стандартный nginx combined + кастомный формат с $request_time в конце
+  private static readonly Regex LogRegex = new(
+      @"^(?<ip>\S+)\s+-\s+\S+\s+\[[^\]]+\]\s+""(?<method>[A-Z]+)\s+(?<uri>\S+)(?:\s+[^""]*)?""\s+(?<status>\d+)",
+      RegexOptions.Compiled);
 
-    public RequestLog? Parse(string logLine)
+  public RequestLog? Parse(string logLine)
+  {
+    if (string.IsNullOrWhiteSpace(logLine))
+      return null;
+
+    var match = LogRegex.Match(logLine.Trim());
+    if (!match.Success)
+      return null;
+
+    try
     {
-        if (string.IsNullOrWhiteSpace(logLine))
-            return null;
-
-        var match = LogRegex.Match(logLine);
-
-        if (!match.Success)
-            return null;
-
-        var trimmed = logLine.TrimEnd();
-        var lastSpace = trimmed.LastIndexOf(' ');
-        if (lastSpace < 0)
-            return null;
-
-        var timeStr = trimmed[(lastSpace + 1)..];
-        if (!double.TryParse(timeStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var responseTime))
-            return null;
-
-        try
-        {
-            return new RequestLog
-            {
-                IpAddress = match.Groups["ip"].Value,
-                HttpMethod = match.Groups["method"].Value,
-                Uri = match.Groups["uri"].Value,
-                StatusCode = int.Parse(match.Groups["status"].Value),
-                ResponseTime = responseTime,
-                Timestamp = DateTime.UtcNow
-            };
-        }
-        catch (Exception)
-        {
-            return null;
-        }
+      return new RequestLog
+      {
+        IpAddress = match.Groups["ip"].Value,
+        HttpMethod = match.Groups["method"].Value,
+        Uri = match.Groups["uri"].Value,
+        StatusCode = int.Parse(match.Groups["status"].Value),
+        ResponseTime = TryParseResponseTime(logLine),
+        Timestamp = DateTime.UtcNow
+      };
     }
+    catch (Exception)
+    {
+      return null;
+    }
+  }
+
+  private static double TryParseResponseTime(string logLine)
+  {
+    var trimmed = logLine.TrimEnd();
+    var lastSpace = trimmed.LastIndexOf(' ');
+    if (lastSpace < 0)
+      return 0.0;
+
+    var lastToken = trimmed[(lastSpace + 1)..].Trim('"');
+    if (double.TryParse(lastToken, NumberStyles.Float, CultureInfo.InvariantCulture, out var responseTime))
+      return responseTime;
+
+    return 0.0;
+  }
 }
