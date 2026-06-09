@@ -8,9 +8,15 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddSingleton<NginxLogParser>();
 
 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+{
     builder.Services.AddSingleton<IBlocker, RealLinuxBlocker>();
+    builder.Services.AddSingleton<IConnectionSnapshotProvider, LinuxSsConnectionProvider>();
+    builder.Services.AddHostedService<L4NetworkMonitor>();
+}
 else
+{
     builder.Services.AddSingleton<IBlocker, MockLinuxBlocker>();
+}
 
 builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<BlacklistSyncWorker>();

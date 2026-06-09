@@ -1,0 +1,21 @@
+<UserControl x:Class="DdosDefendSystem.AdminPanel.Views.L7LogsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="0,12,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Text="L7 HTTP-логи (polling)" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,10"/>
+        <ListView Grid.Row="1" ItemsSource="{Binding Logs}">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="IP Адрес" DisplayMemberBinding="{Binding IpAddress}" Width="150"/>
+                    <GridViewColumn Header="Метод" DisplayMemberBinding="{Binding HttpMethod}" Width="80"/>
+                    <GridViewColumn Header="Эндпоинт" DisplayMemberBinding="{Binding Uri}" Width="250"/>
+                    <GridViewColumn Header="Статус" DisplayMemberBinding="{Binding StatusCode}" Width="80"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+    </Grid>
+</UserControl>

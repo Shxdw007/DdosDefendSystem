@@ -1,0 +1,26 @@
+<UserControl x:Class="DdosDefendSystem.AdminPanel.Views.L4TrafficView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="0,12,0,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Text="L4 трафик в реальном времени (SignalR)" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,10"/>
+        <DataGrid Grid.Row="1" ItemsSource="{Binding TrafficItems}" SelectedItem="{Binding SelectedItem, Mode=OneWay}">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="IP Адрес" Binding="{Binding IpAddress}" Width="180"/>
+                <DataGridTextColumn Header="Соединений" Binding="{Binding ConnectionCount}" Width="120"/>
+                <DataGridTemplateColumn Header="Действие" Width="140">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="Забанить" Style="{StaticResource PrimaryButton}"
+                                    Command="{Binding DataContext.ManualBanCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                    CommandParameter="{Binding}" Padding="8,4"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>

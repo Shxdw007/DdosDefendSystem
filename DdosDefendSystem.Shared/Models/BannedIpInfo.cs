@@ -9,4 +9,8 @@ public class BannedIpInfo
     public DateTime BlockedAt { get; set; }
 
     public DateTime ExpiresAt { get; set; }
+
+    public DateTime? UnblockedAt { get; set; }
+
+    public string? UnblockedBy { get; set; }
 }
