@@ -32,6 +32,18 @@ public class BlacklistSyncWorker : BackgroundService
 
                 if (bannedIps != null)
                 {
+                    var remoteBannedIps = bannedIps.Select(b => b.IpAddress).ToHashSet();
+                    
+                    // Удаляем правила для разбаненных IP (или у которых истек срок)
+                    var ipsToUnban = _locallyBlockedIps.Except(remoteBannedIps).ToList();
+                    foreach (var ip in ipsToUnban)
+                    {
+                        await _blocker.UnblockIpAsync(ip);
+                        _locallyBlockedIps.Remove(ip);
+                        _logger.LogInformation("[SYNC] IP {Ip} удален из iptables (нет в черном списке)", ip);
+                    }
+
+                    // Добавляем новые правила
                     foreach (var ban in bannedIps)
                     {
                         if (!_locallyBlockedIps.Contains(ban.IpAddress))
@@ -41,15 +53,16 @@ public class BlacklistSyncWorker : BackgroundService
                             if (duration.TotalSeconds > 0)
                             {
                                 await _blocker.BlockIpAsync(ban.IpAddress, duration);
-
                                 _locallyBlockedIps.Add(ban.IpAddress);
+                                _logger.LogInformation("[SYNC] IP {Ip} добавлен в iptables", ban.IpAddress);
                             }
                         }
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogWarning("[SYNC] Ошибка синхронизации черного списка. Продолжение работы. Сообщение: {Message}", ex.Message);
             }
 
             await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);

@@ -14,7 +14,7 @@ public class RealLinuxBlocker : IBlocker
 
     public void BlockTarget(string target)
     {
-        RunIptables($"-A INPUT -s {target} -j DROP", target, "блокировка");
+        RunIptables($"-I INPUT 1 -s {target} -j DROP", target, "блокировка");
     }
 
     public Task BlockIpAsync(string ipAddress, TimeSpan duration)

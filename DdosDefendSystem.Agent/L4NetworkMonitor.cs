@@ -14,23 +14,23 @@ public class L4NetworkMonitor : BackgroundService
 
     private readonly ILogger<L4NetworkMonitor> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IBlocker _blocker;
     private readonly IConnectionSnapshotProvider _connectionProvider;
 
-    private readonly ConcurrentDictionary<string, byte> _l4BlockedIps = new();
     private readonly HashSet<string> _whitelist = new();
     private DateTime _lastWhitelistSync = DateTime.MinValue;
     private readonly object _whitelistLock = new();
 
+    // Храним уже отправленные репорты, чтобы не спамить Coordinator
+    private readonly ConcurrentDictionary<string, DateTime> _reportedIps = new();
+    private static readonly TimeSpan ReportCooldown = TimeSpan.FromMinutes(1);
+
     public L4NetworkMonitor(
         ILogger<L4NetworkMonitor> logger,
         IHttpClientFactory httpClientFactory,
-        IBlocker blocker,
         IConnectionSnapshotProvider connectionProvider)
     {
         _logger = logger;
         _httpClientFactory = httpClientFactory;
-        _blocker = blocker;
         _connectionProvider = connectionProvider;
     }
 
@@ -54,7 +54,9 @@ public class L4NetworkMonitor : BackgroundService
 
                 var connectionCounts = await _connectionProvider.GetConnectionCountsAsync(stoppingToken);
                 await SendTrafficSummaryAsync(httpClient, connectionCounts, stoppingToken);
-                await EnforceFloodProtectionAsync(httpClient, connectionCounts, stoppingToken);
+                await DetectFloodAsync(httpClient, connectionCounts, stoppingToken);
+                
+                CleanupReportedIps();
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -62,10 +64,22 @@ public class L4NetworkMonitor : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "[L4] Ошибка цикла мониторинга");
+                _logger.LogWarning(ex, "[L4] Ошибка цикла мониторинга. Продолжение работы.");
             }
 
             await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+        }
+    }
+
+    private void CleanupReportedIps()
+    {
+        var now = DateTime.UtcNow;
+        foreach (var kvp in _reportedIps)
+        {
+            if (now - kvp.Value > ReportCooldown)
+            {
+                _reportedIps.TryRemove(kvp.Key, out _);
+            }
         }
     }
 
@@ -92,7 +106,7 @@ public class L4NetworkMonitor : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "[L4] Не удалось обновить whitelist");
+            _logger.LogWarning(ex, "[L4] Не удалось обновить whitelist. Ошибка: {Message}", ex.Message);
         }
     }
 
@@ -128,11 +142,11 @@ public class L4NetworkMonitor : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "[L4] Не удалось отправить сводку трафика");
+            _logger.LogWarning("[L4] Не удалось отправить сводку трафика. Ошибка: {Message}", ex.Message);
         }
     }
 
-    private async Task EnforceFloodProtectionAsync(
+    private async Task DetectFloodAsync(
         HttpClient httpClient,
         IReadOnlyDictionary<string, int> connectionCounts,
         CancellationToken stoppingToken)
@@ -148,12 +162,13 @@ public class L4NetworkMonitor : BackgroundService
                 continue;
             }
 
-            if (!_l4BlockedIps.TryAdd(ip, 0))
-                continue;
+            if (_reportedIps.ContainsKey(ip))
+                continue; // Уже зарепортили недавно
+                
+            _reportedIps[ip] = DateTime.UtcNow;
 
-            _logger.LogWarning("[L4] FLOOD DETECTED: {Ip} — {Count} соединений. Блокировка iptables...", ip, count);
+            _logger.LogWarning("[L4] FLOOD DETECTED: {Ip} — {Count} соединений. Отправка отчета в Coordinator...", ip, count);
 
-            await _blocker.BlockIpAsync(ip, TimeSpan.FromMinutes(BanDurationMinutes));
             await ReportBanToCoordinatorAsync(httpClient, ip, stoppingToken);
         }
     }
@@ -172,13 +187,13 @@ public class L4NetworkMonitor : BackgroundService
         {
             var response = await httpClient.PostAsJsonAsync("/api/bans/manual", request, stoppingToken);
             if (response.IsSuccessStatusCode)
-                _logger.LogInformation("[L4] Бан IP {Ip} записан в Coordinator.", ip);
+                _logger.LogInformation("[L4] Отчет о флуде для IP {Ip} отправлен в Coordinator.", ip);
             else
-                _logger.LogWarning("[L4] Coordinator отклонил запись бана {Ip}: {Status}", ip, response.StatusCode);
+                _logger.LogWarning("[L4] Coordinator отклонил отчет о флуде {Ip}: {Status}", ip, response.StatusCode);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "[L4] Не удалось записать бан IP {Ip} в Coordinator", ip);
+            _logger.LogWarning("[L4] Не удалось отправить отчет о флуде IP {Ip} в Coordinator. Ошибка: {Message}", ip, ex.Message);
         }
     }
 }

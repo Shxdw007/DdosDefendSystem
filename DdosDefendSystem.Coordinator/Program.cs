@@ -51,7 +51,7 @@ app.MapGet("/", () => "DDoS Coordinator API is running!");
 
 app.MapPost("/api/auth/login", async ([FromBody] LoginRequest request, AppDbContext db) =>
 {
-    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
+    var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Username == request.Username);
 
     if (user == null)
         return Results.Json(new { Message = "INVALID_USER" }, statusCode: 401);
@@ -84,7 +84,8 @@ app.MapPost("/api/logs", ([FromBody] List<RequestLog>? logs, DdosAnalyzer analyz
 app.MapGet("/api/logs/recent", (System.Collections.Concurrent.ConcurrentQueue<RequestLog> recentLogs) =>
     Results.Ok(recentLogs.Reverse().ToList()));
 
-app.MapGet("/api/blacklist", (DdosAnalyzer analyzer) => Results.Ok(analyzer.BannedIps.Values));
+app.MapGet("/api/blacklist", async (AppDbContext db) =>
+    Results.Ok(await db.BannedIps.AsNoTracking().ToListAsync()));
 
 app.MapPost("/api/blacklist/update", async ([FromBody] BannedIpInfo updatedBan, AppDbContext db, DdosAnalyzer analyzer) =>
 {
@@ -115,7 +116,7 @@ app.MapDelete("/api/blacklist/unban", async ([FromQuery] string ip, AppDbContext
 });
 
 app.MapGet("/api/whitelist", async (AppDbContext db) =>
-    Results.Ok(await db.WhitelistIps.OrderBy(w => w.IpAddress).ToListAsync()));
+    Results.Ok(await db.WhitelistIps.AsNoTracking().OrderBy(w => w.IpAddress).ToListAsync()));
 
 app.MapPost("/api/whitelist", async ([FromBody] WhitelistIpRequest request, AppDbContext db) =>
 {
@@ -230,6 +231,7 @@ app.MapPost("/api/audit/login", async ([FromBody] AuditLoginRequest request, Aud
 
 app.MapGet("/api/audit", async (AppDbContext db) =>
     Results.Ok(await db.AuditLogs
+        .AsNoTracking()
         .OrderByDescending(a => a.Timestamp)
         .Take(500)
         .ToListAsync()));
