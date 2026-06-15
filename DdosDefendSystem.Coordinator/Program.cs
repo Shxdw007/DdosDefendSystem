@@ -26,7 +26,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate(); 
+    db.Database.Migrate();
 
     if (!db.Users.Any())
     {
@@ -39,6 +39,9 @@ using (var scope = app.Services.CreateScope())
         });
         db.SaveChanges();
     }
+
+    var analyzer = scope.ServiceProvider.GetRequiredService<DdosAnalyzer>();
+    await analyzer.LoadStateFromDatabaseAsync(db);
 }
 
 if (app.Environment.IsDevelopment())
@@ -85,7 +88,10 @@ app.MapGet("/api/logs/recent", (System.Collections.Concurrent.ConcurrentQueue<Re
     Results.Ok(recentLogs.Reverse().ToList()));
 
 app.MapGet("/api/blacklist", async (AppDbContext db) =>
-    Results.Ok(await db.BannedIps.AsNoTracking().ToListAsync()));
+    Results.Ok(await db.BannedIps
+        .AsNoTracking()
+        .Where(b => b.UnblockedAt == null && b.ExpiresAt > DateTime.UtcNow)
+        .ToListAsync()));
 
 app.MapPost("/api/blacklist/update", async ([FromBody] BannedIpInfo updatedBan, AppDbContext db, DdosAnalyzer analyzer) =>
 {
@@ -118,7 +124,7 @@ app.MapDelete("/api/blacklist/unban", async ([FromQuery] string ip, AppDbContext
 app.MapGet("/api/whitelist", async (AppDbContext db) =>
     Results.Ok(await db.WhitelistIps.AsNoTracking().OrderBy(w => w.IpAddress).ToListAsync()));
 
-app.MapPost("/api/whitelist", async ([FromBody] WhitelistIpRequest request, AppDbContext db) =>
+app.MapPost("/api/whitelist", async ([FromBody] WhitelistIpRequest request, AppDbContext db, DdosAnalyzer analyzer) =>
 {
     if (string.IsNullOrWhiteSpace(request.IpAddress))
         return Results.BadRequest("IpAddress is required.");
@@ -135,10 +141,13 @@ app.MapPost("/api/whitelist", async ([FromBody] WhitelistIpRequest request, AppD
 
     db.WhitelistIps.Add(entry);
     await db.SaveChangesAsync();
+
+    analyzer.AddToWhitelist(entry.IpAddress);
+
     return Results.Created($"/api/whitelist/{entry.IpAddress}", entry);
 });
 
-app.MapDelete("/api/whitelist/{ip}", async (string ip, AppDbContext db) =>
+app.MapDelete("/api/whitelist/{ip}", async (string ip, AppDbContext db, DdosAnalyzer analyzer) =>
 {
     var entry = await db.WhitelistIps.FindAsync(ip);
     if (entry == null)
@@ -146,6 +155,9 @@ app.MapDelete("/api/whitelist/{ip}", async (string ip, AppDbContext db) =>
 
     db.WhitelistIps.Remove(entry);
     await db.SaveChangesAsync();
+
+    analyzer.RemoveFromWhitelist(ip);
+
     return Results.Ok();
 });
 

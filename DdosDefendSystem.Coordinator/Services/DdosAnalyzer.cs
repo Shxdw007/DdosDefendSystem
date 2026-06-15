@@ -1,6 +1,7 @@
-﻿using System.Collections.Concurrent;
+﻿using DdosDefendSystem.Coordinator.Data;
 using DdosDefendSystem.Shared.Models;
-using DdosDefendSystem.Coordinator.Data;
+using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 
 namespace DdosDefendSystem.Coordinator.Services;
 
@@ -13,7 +14,32 @@ public class DdosAnalyzer
 
     private readonly ILogger<DdosAnalyzer> _logger;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _whitelist = new();
 
+    public bool IsWhitelisted(string ip) => _whitelist.ContainsKey(ip);
+
+    public void AddToWhitelist(string ip) => _whitelist[ip] = 0;
+
+    public void RemoveFromWhitelist(string ip) => _whitelist.TryRemove(ip, out _);
+
+    public async Task LoadStateFromDatabaseAsync(AppDbContext db)
+    {
+        var activeBans = await db.BannedIps
+            .AsNoTracking()
+            .Where(b => b.UnblockedAt == null && b.ExpiresAt > DateTime.UtcNow)
+            .ToListAsync();
+
+        BannedIps.Clear();
+        foreach (var ban in activeBans)
+            BannedIps[ban.IpAddress] = ban;
+
+        var whitelist = await db.WhitelistIps.AsNoTracking().ToListAsync();
+        _whitelist.Clear();
+        foreach (var entry in whitelist)
+            _whitelist[entry.IpAddress] = 0;
+
+        Console.WriteLine($"[Analyzer] Загружено: {activeBans.Count} активных банов, {whitelist.Count} IP в белом списке");
+    }
     public DdosAnalyzer(ILogger<DdosAnalyzer> logger, IServiceScopeFactory scopeFactory)
     {
         _logger = logger;
@@ -100,6 +126,12 @@ public class DdosAnalyzer
 
     private void TryBan(string target, string reason, TimeSpan duration)
     {
+        if (!target.Contains('/') && IsWhitelisted(target))
+        {
+            Console.WriteLine($"[WHITELIST] IP {target} пропущен, бан отменён: {reason}");
+            return;
+        }
+
         var banInfo = new BannedIpInfo
         {
             IpAddress = target,
@@ -110,9 +142,7 @@ public class DdosAnalyzer
 
         if (BannedIps.TryAdd(target, banInfo))
         {
-            _logger.LogWarning("[DDoS DETECTED] {Target} отправлен в ЧЕРНЫЙ СПИСОК на {Minutes} минут! Причина: {Reason}",
-                target, duration.TotalMinutes, reason);
-
+            _logger.LogWarning("[DDoS DETECTED] {Target} отправлен в ЧЕРНЫЙ СПИСОК на {Minutes} минут! Причина: {Reason}", target, duration.TotalMinutes, reason);
             Task.Run(() => SaveBanToDatabase(banInfo));
         }
     }
